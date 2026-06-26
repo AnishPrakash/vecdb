@@ -3,3 +3,4 @@ pub mod distance;
 pub mod flat_index;
 pub mod hnsw;
 pub mod quantize;
+pub mod wal;
