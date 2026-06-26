@@ -1,7 +1,7 @@
 # vecdb
 **Native Vector Database in Rust**
 
-![CI](https://github.com/AnishPrakash/vecdb/actions/workflows/ci.yml/badge.svg)
+[![Build Status](https://github.com/AnishPrakash/vecdb/actions/workflows/ci.yml/badge.svg)](https://github.com/AnishPrakash/vecdb/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## Performance (SIFT1M 1M x 128-dim)
