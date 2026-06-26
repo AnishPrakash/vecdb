@@ -21,6 +21,7 @@ impl MmapStorage {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(path)?;
             
         file.set_len(total as u64)?;

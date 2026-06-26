@@ -57,6 +57,7 @@ impl HnswIndex {
     }
 
     pub fn len(&self) -> usize { self.nodes.len() }
+    pub fn is_empty(&self) -> bool { self.nodes.is_empty() }
 
     // Sample the max layer for a new node using exponential decay
     fn random_level(&self) -> usize {
