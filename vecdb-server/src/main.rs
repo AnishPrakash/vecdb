@@ -13,7 +13,10 @@ struct AppState {
     index: RwLock<HnswIndex>,
     wal: Mutex<Wal>,
 }
-
+#[derive(Deserialize)]
+struct DeleteReq {
+    id: u64,
+}
 // Request / Response types
 #[derive(Deserialize)]
 struct InsertReq {
@@ -21,12 +24,16 @@ struct InsertReq {
     vector: Vec<f32>,
     payload: Option<serde_json::Value>,
 }
-
+#[derive(Deserialize)]
+struct BatchInsertReq {
+    items: Vec<InsertReq>,
+}
 #[derive(Deserialize)]
 struct SearchReq {
     vector: Vec<f32>,
     top_k: usize,
     ef: Option<usize>,
+    filter: Option<serde_json::Value>,
 }
 
 #[derive(Serialize)]
@@ -59,14 +66,63 @@ async fn insert(
 
     Json(serde_json::json!({ "status": "ok" }))
 }
+async fn delete(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<DeleteReq>,
+) -> Json<serde_json::Value> {
+    // 1. Write to WAL first for durability
+    {
+        let rec = WalRecord::Delete { id: req.id };
+        let mut wal = state.wal.lock().await;
+        wal.append(&rec).expect("WAL write failed");
+    }
 
+    // 2. Mark as tombstone in memory
+    let mut index = state.index.write().await;
+    index.delete(req.id);
+
+    Json(serde_json::json!({ "status": "deleted", "id": req.id }))
+}
+async fn batch_insert(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<BatchInsertReq>,
+) -> Json<serde_json::Value> {
+    let count = req.items.len();
+
+    // 1. Bulk write to WAL for durability
+    {
+        let mut wal = state.wal.lock().await;
+        for item in &req.items {
+            let payload = item.payload.clone().unwrap_or(serde_json::Value::Null);
+            let rec = WalRecord::Insert {
+                id: item.id,
+                vector: item.vector.clone(),
+                payload,
+            };
+            wal.append(&rec).expect("WAL batch write failed");
+        }
+    }
+
+    // 2. Bulk update in-memory index
+    let mut index = state.index.write().await;
+    for item in req.items {
+        let payload = item.payload.unwrap_or(serde_json::Value::Null);
+        index.insert(item.id, item.vector, payload);
+    }
+
+    Json(serde_json::json!({ 
+        "status": "batch_completed", 
+        "inserted": count 
+    }))
+}
 async fn search(
     State(state): State<Arc<AppState>>,
     Json(req): Json<SearchReq>,
 ) -> Json<Vec<SearchResult>> {
+    dbg!(&req.filter);
     let ef = req.ef.unwrap_or(50);
     let index = state.index.read().await;
-    let results = index.search(&req.vector, req.top_k, ef);
+    let results = index.search(&req.vector, req.top_k, ef, req.filter.as_ref());
     
     Json(
         results
@@ -97,8 +153,8 @@ async fn main() {
             WalRecord::Insert { id, vector, payload } => {
                 index.insert(id, vector, payload);
             }
-            WalRecord::Delete { .. } => {
-                // Delete handling can be added later
+            WalRecord::Delete { id } => {
+                index.delete(id);
             }
         }
     }
@@ -110,7 +166,9 @@ async fn main() {
 
     let app = Router::new()
         .route("/insert", post(insert))
+        .route("/batch_insert", post(batch_insert))
         .route("/search", post(search))
+        .route("/delete", post(delete))
         .route("/health", get(health))
         .with_state(state);
 
