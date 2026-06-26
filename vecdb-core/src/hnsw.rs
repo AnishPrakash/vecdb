@@ -28,7 +28,7 @@ impl Eq for Candidate {}
 
 impl PartialOrd for Candidate {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.1.partial_cmp(&other.1)
+        Some(self.cmp(other))
     }
 }
 
@@ -49,7 +49,9 @@ impl HnswIndex {
             tombstones: HashSet::new(),
         }
     }
-
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     pub fn len(&self) -> usize {
         self.nodes.len() - self.tombstones.len()
     }
@@ -89,7 +91,7 @@ impl HnswIndex {
         };
         
         // This log will reveal exactly which node is lying to us
-        if result == true {
+        if result {
              println!("DEBUG: MATCH FOUND! Payload: {:?} vs Filter: {:?}", payload, filter);
         }
         
@@ -116,7 +118,7 @@ impl HnswIndex {
         candidates.push(std::cmp::Reverse(Candidate(ep, ep_dist)));
         
         let ep_node = &self.nodes[&ep];
-        let is_match = filter.map_or(true, |f| Self::matches_filter(&ep_node.payload, f));
+        let is_match = filter.is_none_or(|f| Self::matches_filter(&ep_node.payload, f));
         if is_match && !self.tombstones.contains(&ep) {
             results.push(Candidate(ep, ep_dist));
         }
@@ -142,7 +144,7 @@ impl HnswIndex {
                     candidates.push(std::cmp::Reverse(Candidate(nbr_id, d)));
                     
                     let nbr_node = &self.nodes[&nbr_id];
-                    let matches = filter.map_or(true, |f| Self::matches_filter(&nbr_node.payload, f));
+                    let matches = filter.is_none_or(|f| Self::matches_filter(&nbr_node.payload, f));
                     
                     if matches && !self.tombstones.contains(&nbr_id) {
                         results.push(Candidate(nbr_id, d));
