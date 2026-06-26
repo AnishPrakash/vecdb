@@ -1,0 +1,3 @@
+[workspace]
+members = ["vecdb-core", "vecdb-server", "vecdb-cli"]
+resolver = "2"
