@@ -5,4 +5,4 @@ pub mod hnsw;
 pub mod quantize;
 pub mod wal;
 pub mod storage;
-pub mod quantizer;`
+pub mod quantizer;

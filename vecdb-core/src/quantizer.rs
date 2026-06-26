@@ -1,6 +1,8 @@
-use ndarray::{Array2, ArrayView1};
-use linfa_clustering::KMeans;
+use ndarray::Array2;
+use linfa::traits::Fit; // <--- YOU WERE MISSING THIS
 use linfa::prelude::*;
+use linfa_clustering::KMeans;
+
 
 pub struct Quantizer {
     pub m: usize,         // Number of sub-vectors
